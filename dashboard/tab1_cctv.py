@@ -8,8 +8,33 @@ import numpy as np
 import folium
 from folium.plugins import MarkerCluster
 import os
+import urllib.request
 
-# CCTV 데이터 로더
+# ────── 한글 폰트 로드 ──────
+
+# 1) 로컬 Windows 맑은고딕
+win_font = "C:\\Windows\\Fonts\\malgun.ttf"
+if os.path.exists(win_font):
+    font_path = win_font
+else:
+    # 2) 없으면 NanumGothic.ttf 자동 다운로드
+    font_path = "NanumGothic.ttf"
+    if not os.path.exists(font_path):
+        try:
+            url = "https://github.com/naver/nanumfont/blob/master/ttf/NanumGothic.ttf?raw=true"
+            urllib.request.urlretrieve(url, font_path)
+        except Exception as e:
+            st.error(f"❌ 한글 폰트 로드 실패: {e}")
+            font_path = None
+
+if font_path:
+    fontprop = fm.FontProperties(fname=font_path)
+    plt.rcParams['axes.unicode_minus'] = False
+else:
+    fontprop = None  # 기본 폰트 사용
+
+# ────── 데이터 로더 ──────
+
 @st.cache_data
 def load_cctv_data():
     df = pd.read_excel("data/12_04_08_E_CCTV정보.xlsx", engine="openpyxl")
@@ -24,7 +49,7 @@ def load_cctv_data():
         find("카메라대수"): "대수"
     }).dropna(subset=["위도", "경도"])
 
-# 범죄 데이터 로더 (키워드 기반 컬럼 탐지)
+
 @st.cache_data
 def load_crime_data():
     path = "data/경찰청 부산광역시경찰청_경찰서별 5대 범죄 발생 현황_20231231.csv"
@@ -38,51 +63,27 @@ def load_crime_data():
     else:
         raise UnicodeDecodeError(f"❌ 파일 '{path}' 인코딩 오류. UTF-8 또는 CP949 확인 요망.")
 
-    # 공백 제거
     df.columns = df.columns.str.strip()
     cols = df.columns.tolist()
 
-    # 컬럼 탐색 함수
-    def find_cols(keywords):
-        found = []
-        for kw in keywords:
-            matches = [c for c in cols if kw in c]
-            if matches:
-                found.extend(matches)
-        return found
-
-    # 경찰서 컬럼
+    # 컬럼 동적 탐색
     station_col = next((c for c in cols if "경찰서" in c), None)
-    if not station_col:
-        raise KeyError(f"❌ '경찰서' 컬럼을 찾을 수 없습니다. 실제 컬럼: {cols}")
+    cctv_col    = next((c for c in cols if "cctv" in c.lower()), None)
+    crime_keys  = ["살인", "강도", "성범죄", "폭력"]
+    crime_cols  = [c for c in cols for kw in crime_keys if kw in c]
 
-    # CCTV 개수 컬럼
-    cctv_cols = find_cols(["cctv"])
-    if not cctv_cols:
-        raise KeyError(f"❌ 'CCTV' 키워드 포함 컬럼이 없습니다. 실제 컬럼: {cols}")
-    cctv_col = cctv_cols[0]
+    if not (station_col and cctv_col and crime_cols):
+        raise KeyError(f"❌ 컬럼 탐색 실패:\n경찰서:{station_col}, CCTV:{cctv_col}, 범죄:{crime_cols}")
 
-    # 5대 범죄 키워드 컬럼
-    crime_keys = ["살인", "강도", "성범죄", "폭력"]
-    crime_cols = find_cols(crime_keys)
-    if not crime_cols:
-        raise KeyError(f"❌ 5대 범죄 컬럼을 찾을 수 없습니다. 실제 컬럼: {cols}")
-    
-    # 합계 컬럼 추가
+    # 5대 범죄 합계 & 컬럼명 통일
     df["5대 범죄 합계"] = df[crime_cols].sum(axis=1)
-    df.rename(columns={cctv_col: "cctv개수", station_col: "경찰서"}, inplace=True)
-
+    df = df.rename(columns={station_col: "경찰서", cctv_col: "cctv개수"})
     return df.sort_values("경찰서")
 
-def tab1_cctv():
-    # 한글 폰트
-    font_path = "C:\\Windows\\Fonts\\malgun.ttf"
-    if not os.path.exists(font_path):
-        st.error(f"❌ 폰트 파일 없음:\n{font_path}")
-        return
-    fontprop = fm.FontProperties(fname=font_path)
-    plt.rcParams['axes.unicode_minus'] = False
 
+# ────── 탭1 함수 ──────
+
+def tab1_cctv():
     col1, col2 = st.columns([1, 1.5])
 
     # CCTV 지도
