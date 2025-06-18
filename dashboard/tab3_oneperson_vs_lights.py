@@ -28,23 +28,33 @@ if font_path:
 else:
     fontprop = None
 
-# ─── CSV 로더 (인코딩 폴백) ───
+# ─── CSV 로더 (다중 인코딩 폴백) ───
 @st.cache_data
 def load_lights_data(path="data/가로등현황.csv"):
-    for enc in ("utf-8-sig", "cp949", "utf-8"):
+    encodings = ('utf-8-sig', 'cp949', 'euc-kr', 'latin1', 'utf-8')
+    for enc in encodings:
         try:
             df = pd.read_csv(path, encoding=enc)
             df.columns = df.columns.str.strip()
             return df
-        except UnicodeDecodeError:
+        except Exception:
             continue
-    raise UnicodeDecodeError(f"❌ 파일 '{path}' 인코딩을 인식할 수 없습니다.")
+    # 마지막 수단으로 latin1 강제
+    df = pd.read_csv(path, encoding='latin1')
+    df.columns = df.columns.str.strip()
+    return df
 
-# ─── ‘지역’ 컬럼 탐지 함수 ───
+# ─── ‘지역’ 컬럼 탐지 및 리네임 ───
 def find_and_rename_region(df, candidates=('관리부서','지역','관서','구역')):
+    # 1) 후보 키워드 매칭
     for col in df.columns:
         if any(kw in col for kw in candidates):
             return df.rename(columns={col: '지역'})
+    # 2) 마지막 컬럼이 비숫자형이면 지역으로 사용
+    last = df.columns[-1]
+    if not pd.api.types.is_numeric_dtype(df[last]):
+        return df.rename(columns={last: '지역'})
+    # 실패 시 에러
     raise KeyError(f"❌ '지역' 역할 컬럼을 찾을 수 없습니다. 실제 컬럼: {list(df.columns)}")
 
 # ─── 탭3 함수 ───
@@ -52,20 +62,22 @@ def tab3_oneperson_vs_lights():
     st.subheader("🏠 1인 가구 수 vs 가로등 수")
 
     try:
-        # 1) 고정 데이터: 1인 가구
-        one_person_data = {
+        # 1) 1인 가구 데이터 하드코딩
+        one_person = {
             '지역': ['중부','동래','영도','동부','부산진','서부','남부','해운대',
                    '사상','금정','사하','연제','강서','북부','기장'],
             '1인 가구 수': [11786,35220,20116,18603,70609,20760,40521,50516,
                          36299,40412,46442,30846,17355,36975,22500]
         }
-        df_one = pd.DataFrame(one_person_data)
+        df_one = pd.DataFrame(one_person)
 
-        # 2) 가로등 데이터 로드
+        # 2) 가로등 데이터 로드 & 전처리
         df_lights = load_lights_data()
         df_lights = find_and_rename_region(df_lights)
-        # 합계 컬럼명 찾아서 '가로등 수'로 통일
-        sum_col = next(c for c in df_lights.columns if '합계' in c)
+        # ‘합계’ 키워드 포함 컬럼 탐색
+        sum_col = next((c for c in df_lights.columns if '합계' in c), None)
+        if not sum_col:
+            raise KeyError(f"❌ 가로등 합계 컬럼을 찾을 수 없습니다. 실제 컬럼: {list(df_lights.columns)}")
         df_lights = df_lights[['지역', sum_col]].rename(columns={sum_col:'가로등 수'})
 
         # 3) 병합
@@ -74,7 +86,7 @@ def tab3_oneperson_vs_lights():
         # 4) 산점도
         fig1, ax1 = plt.subplots()
         ax1.scatter(df_merged['1인 가구 수'], df_merged['가로등 수'])
-        for i, row in df_merged.iterrows():
+        for _, row in df_merged.iterrows():
             ax1.text(
                 row['1인 가구 수'], row['가로등 수'],
                 row['지역'], fontsize=9,
@@ -85,13 +97,12 @@ def tab3_oneperson_vs_lights():
         ax1.set_title("1인 가구 수 vs 가로등 수 (산점도)", fontproperties=fontprop)
         st.pyplot(fig1)
 
-        # 5) 막대그래프
+        # 5) 막대 그래프
         fig2, ax2 = plt.subplots(figsize=(12,6))
         idx = np.arange(len(df_merged))
         width = 0.4
         ax2.bar(idx, df_merged['1인 가구 수'], width, label='1인 가구 수')
         ax2.bar(idx+width, df_merged['가로등 수'], width, label='가로등 수')
-
         ax2.set_xticks(idx + width/2)
         ax2.set_xticklabels(df_merged['지역'], rotation=45, fontproperties=fontprop)
         ax2.set_ylabel("건수", fontproperties=fontprop)
