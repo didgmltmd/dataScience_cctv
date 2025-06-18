@@ -72,25 +72,25 @@ def load_crime_data_csv():
 def tab1_cctv():
     col1, col2 = st.columns([1,1.5])
 
-    with col1:
-        st.subheader("📍 CCTV 위치 분포도 (PyDeck)")
-        df = load_cctv_data_csv()
-        # ScatterplotLayer로 WebGL 렌더링
-        layer = pdk.Layer(
-            "ScatterplotLayer",
-            data=df,
-            get_position=["경도","위도"],
-            get_radius=100,
-            pickable=True,
-            opacity=0.8,
-            get_fill_color=[255,140,0]
-        )
-        view = pdk.ViewState(
-            latitude=df["위도"].mean(),
-            longitude=df["경도"].mean(),
-            zoom=11
-        )
-        st.pydeck_chart(pdk.Deck(layers=[layer], initial_view_state=view))
+    # with col1:
+    #     st.subheader("📍 CCTV 위치 분포도 (PyDeck)")
+    #     df = load_cctv_data_csv()
+    #     # ScatterplotLayer로 WebGL 렌더링
+    #     layer = pdk.Layer(
+    #         "ScatterplotLayer",
+    #         data=df,
+    #         get_position=["경도","위도"],
+    #         get_radius=100,
+    #         pickable=True,
+    #         opacity=0.8,
+    #         get_fill_color=[255,140,0]
+    #     )
+    #     view = pdk.ViewState(
+    #         latitude=df["위도"].mean(),
+    #         longitude=df["경도"].mean(),
+    #         zoom=11
+    #     )
+    #     st.pydeck_chart(pdk.Deck(layers=[layer], initial_view_state=view))
 
     with col2:
         st.subheader("📊 CCTV 개수 vs 5대 범죄 발생 수")

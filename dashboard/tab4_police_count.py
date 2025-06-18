@@ -25,16 +25,13 @@ else:
 if font_path:
     # 1) 폰트를 Matplotlib에 등록
     fm.fontManager.addfont(font_path)
-    # 2) 등록된 폰트 이름 얻어오기
+    # 2) 등록된 폰트 이름 얻기
     font_name = fm.FontProperties(fname=font_path).get_name()
     # 3) 전역 rcParam으로 설정
     plt.rcParams['font.family'] = font_name
-    plt.rcParams['axes.unicode_minus'] = False
-else:
-    # 폰트가 없으면 기본 설정 유지
-    plt.rcParams['axes.unicode_minus'] = False
 
-# ─── 이하 load_police_data(), find_column(), tab4_police_count() 등 그대로 ───
+# 한글 마이너스 기호 깨짐 방지
+plt.rcParams['axes.unicode_minus'] = False
 
 # ─── 경찰서 데이터 로더 (UTF-8 전용) ───
 @st.cache_data
@@ -52,7 +49,8 @@ def find_column(df, keywords):
 
 # ─── 탭4 함수 ───
 def tab4_police_count():
-    st.subheader("🚓 부산 동별 경찰서 수")
+    # 서브헤더에서 이모지 제거
+    st.subheader("부산 동별 경찰서 수")
 
     try:
         df = load_police_data()
@@ -72,18 +70,19 @@ def tab4_police_count():
         bars = ax.bar(df["지역"], df["개수"], color="skyblue")
 
         ax.set_xticks(range(len(df)))
-        ax.set_xticklabels(df["지역"], rotation=45,
-                           fontproperties=fontprop)
-        ax.set_xlabel("지역", fontproperties=fontprop)
-        ax.set_ylabel("경찰서 수", fontproperties=fontprop)
-        ax.set_title("부산 동별 경찰서 수", fontproperties=fontprop)
+        ax.set_xticklabels(df["지역"], rotation=45)
+        ax.set_xlabel("지역")
+        ax.set_ylabel("경찰서 수")
+        ax.set_title("부산 동별 경찰서 수")
 
         for bar in bars:
             h = bar.get_height()
             ax.text(
-                bar.get_x() + bar.get_width() / 2, h,
-                f"{int(h)}", ha="center", va="bottom",
-                fontproperties=fontprop
+                bar.get_x() + bar.get_width() / 2,
+                h,
+                f"{int(h)}",
+                ha="center",
+                va="bottom"
             )
 
         st.pyplot(fig)
