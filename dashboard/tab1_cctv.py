@@ -128,4 +128,4 @@ def tab1_cctv():
 
             st.pyplot(fig)
         except Exception as e:
-            st.error(f"❌ CCTV/범죄 시각화 오류:\n{e}")
+            st.error(f"❌ CCTV/범죄 시각화 오류sdf:\n{e}")
